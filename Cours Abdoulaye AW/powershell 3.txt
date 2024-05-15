@@ -1,0 +1,233 @@
+activer hyper-v
+enabled-WindowsOptionalFeature -Online -FeatureName Microsoft-hyper-v-all
+verifier les cartes réseaux 
+Get-NetAdapter
+création d'un switch externe
+New-VMSwitch -name Externe -NetAdapterName WI-FI
+création de switch privé
+New-VMSwitch -name MPIO1 -SwitchType Private
+New-VMSwitch -name MPIO2 -SwitchType Private
+New-VMSwitch -name Pulsation -SwitchType Private  
+création de switch interne 
+New-VMSwitch -name Interne -SwitchType Internal
+
+
+
+Création d'une VM ( Master)
+
+New-VM -Name Master -MemoryStartupBytes 6GB -Path c:\hyper-v\Master -NewVHDPath C:\Hyper-V\Master\Master.vhdx -Generation 2 -SwitchName interne -NewVHDSizeBytes 200GB
+Activer les services d'invité (tools)
+Enable-VMIntegrationService -VMName Master -Name Interface*
+modifier le nombre de CPU
+Set-VM -Name Master -ProcessorCount 2
+desactiver le point de control ( désactiver le snapshot)
+Set-VM -Name Master -CheckpointType Disabled
+
+Set-VM -Name Master -CheckpointType Disabled
+ 
+
+Add-VMDvdDrive -VMName Master -Path C:\ISO\fr-fr_windows_server_2022_x64_dvd_9f7d1adb.iso
+ 
+ 
+$vmdvd = Get-VMDvdDrive -VMName Master
+ 
+Set-VMFirmware -VMName Master -FirstBootDevice $vmdvd
+
+
+
+
+Procedure pour le sysprep (enlever les parametres specifique à une machine en vue de le deployer ou de le cloner )
+cd C:\windows\system32\sysprep
+taper .\sysprep.exe /generalize /oobe /shutdown
+ou 
+C:\windows\system32\sysprep\sysprep.exe /generalize /oobe /shutdown
+
+
+mettre disque de Master en lecture seul (Read Only)
+  creation de disque de différenciation à partir d'un Parent
+
+New-VHD -Path C:\Hyper-V\Hote-01\Hote-01.vhdx -ParentPath c:\hyper-v\master\master.vhdx -Differencing
+New-VHD -Path C:\Hyper-V\Hote-02\Hote-02.vhdx -ParentPath c:\hyper-v\master\master.vhdx -Differencing
+New-VHD -Path C:\Hyper-V\Hote-03\Hote-03.vhdx -ParentPath c:\hyper-v\master\master.vhdx -Differencing
+New-VHD -Path C:\Hyper-V\DC-01\DC-01.vhdx -ParentPath c:\hyper-v\master\master.vhdx -Differencing
+
+creation de VMs à partir de disque de differenciation 
+New-VM -Name Hote-03 -MemoryStartupBytes 6GB -Path c:\hyper-v\Hote-03 -VHDPath C:\Hyper-V\Hote-03\Hote-03.vhdx -Generation 2 -SwitchName interne
+New-VM -Name Hote-02 -MemoryStartupBytes 6GB -Path c:\hyper-v\Hote-02 -VHDPath C:\Hyper-V\Hote-02\Hote-02.vhdx -Generation 2 -SwitchName interne
+New-VM -Name Hote-01 -MemoryStartupBytes 6GB -Path c:\hyper-v\Hote-01 -VHDPath C:\Hyper-V\Hote-01\Hote-01.vhdx -Generation 2 -SwitchName interne
+New-VM -Name DC-01 -MemoryStartupBytes 6GB -Path c:\hyper-v\DC-01 -VHDPath C:\Hyper-V\DC-01\DC-01.vhdx -Generation 2 -SwitchName interne
+Enable-VMIntegrationService -VMName DC-01, Hote-01, hote-02, hote-03 -Name Interface*
+Set-VM -Name DC-01, Hote-01, hote-02, hote-03 -ProcessorCount 2
+Set-VM -Name DC-01, Hote-01, hote-02, hote-03 -CheckpointType Disabled
+
+
+DC-01
+Rename-Computer DC-01 
+Rename-LocalUser administrateur -NewName Admin 
+Restart-Computer  
+Rename-NetAdapter -Name ethernet -NewName Interne 
+New-NetIPAddress -InterfaceAlias Interne -IPAddress 10.144.0.1 -PrefixLength 24 -DefaultGateway 10.144.0.254
+Set-DnsClientServerAddress -InterfaceAlias interne -ServerAddresses 10.144.0.1
+Install-WindowsFeature ad-domain-services -IncludeAllSubFeature -IncludeManagementTools
+Install-ADDSForest -DomainName form-it.lab -InstallDns:$true 
+
+
+New-ADOrganizationalUnit -Name IT -Path "dc=form-it,dc=lab"
+New-ADOrganizationalUnit -Name Vente -Path "dc=form-it,dc=lab"
+ 
+New-ADOrganizationalUnit -Name Direction -Path "dc=form-it,dc=lab"
+ 
+New-ADOrganizationalUnit -Name RH -Path "dc=form-it,dc=lab"
+
+New-ADGroup -name Directeurs -Path "OU=Direction,DC=form-it,DC=lab" -GroupCategory Security -GroupScope Global
+New-ADGroup -name Techniciens -Path "OU=IT,DC=form-it,DC=lab" -GroupCategory Security -GroupScope Global
+New-ADGroup -name Ingenieurs -Path "OU=IT,DC=form-it,DC=lab" -GroupCategory Security -GroupScope Global
+New-ADGroup -name Recrureurs -Path "OU=RH,DC=form-it,DC=lab" -GroupCategory Security -GroupScope Global
+New-ADGroup -name Vendeurs -Path "OU=Vente,DC=form-it,DC=lab" -GroupCategory Security -GroupScope Global
+
+
+Hote-01
+ Rename-NetAdapter -Name ethernet -NewName Interne 
+New-NetIPAddress -InterfaceAlias Interne -IPAddress 10.144.0.10 -PrefixLength 24 -DefaultGateway 10.144.0.254
+Set-DnsClientServerAddress -InterfaceAlias interne -ServerAddresses 10.144.0.1
+Rename-Computer Hote-01
+Add-Computer -DomaineName form-it.lab -Credential admin@form-it.lab
+Restart-Computer 
+se connecter avec Admin ( l'administrateur du domaine)
+Rename-NetAdapter -Name "ethernet 2"  -NewName MPIO1
+New-NetIPAddress -InterfaceAlias Interne -IPAddress 10.144.1.10 -PrefixLength 24 
+Set-DnsClientServerAddress -InterfaceAlias interne -ServerAddresses 10.144.0.1
+Rename-NetAdapter -Name "ethernet 3"  -NewName MPIO2
+New-NetIPAddress -InterfaceAlias Interne -IPAddress 10.144.2.10 -PrefixLength 24 
+Set-DnsClientServerAddress -InterfaceAlias interne -ServerAddresses 10.144.0.1
+Rename-NetAdapter -Name "ethernet 4"  -NewName Pulsation
+New-NetIPAddress -InterfaceAlias Interne -IPAddress 10.144.3.10 -PrefixLength 24 
+Set-DnsClientServerAddress -InterfaceAlias interne -ServerAddresses 10.144.0.1
+
+
+Hote-02
+ Rename-NetAdapter -Name ethernet -NewName Interne 
+New-NetIPAddress -InterfaceAlias Interne -IPAddress 10.144.0.20 -PrefixLength 24 -DefaultGateway 10.144.0.254
+Set-DnsClientServerAddress -InterfaceAlias interne -ServerAddresses 10.144.0.1
+Rename-Computer Hote-02
+Add-Computer -DomaineName form-it.lab -Credential admin@form-it.lab
+Restart-Computer 
+se connecter avec Admin ( l'administrateur du domaine)
+Rename-NetAdapter -Name "ethernet 2"  -NewName MPIO1
+New-NetIPAddress -InterfaceAlias Interne -IPAddress 10.144.1.20 -PrefixLength 24 
+Set-DnsClientServerAddress -InterfaceAlias interne -ServerAddresses 10.144.0.1
+Rename-NetAdapter -Name "ethernet 3"  -NewName MPIO2
+New-NetIPAddress -InterfaceAlias Interne -IPAddress 10.144.2.20 -PrefixLength 24 
+Set-DnsClientServerAddress -InterfaceAlias interne -ServerAddresses 10.144.0.1
+Rename-NetAdapter -Name "ethernet 4"  -NewName Pulsation
+New-NetIPAddress -InterfaceAlias Interne -IPAddress 10.144.3.20 -PrefixLength 24 
+Set-DnsClientServerAddress -InterfaceAlias interne -ServerAddresses 10.144.0.1
+
+Hote-03
+ Rename-NetAdapter -Name ethernet -NewName Interne 
+New-NetIPAddress -InterfaceAlias Interne -IPAddress 10.144.0.30 -PrefixLength 24 -DefaultGateway 10.144.0.254
+Set-DnsClientServerAddress -InterfaceAlias interne -ServerAddresses 10.144.0.1
+Rename-Computer Hote-03
+Add-Computer -DomaineName form-it.lab -Credential admin@form-it.lab
+Restart-Computer 
+se connecter avec Admin ( l'administrateur du domaine)
+Rename-NetAdapter -Name "ethernet 2"  -NewName MPIO1
+New-NetIPAddress -InterfaceAlias Interne -IPAddress 10.144.1.30 -PrefixLength 24 éa"
+Set-DnsClientServerAddress -InterfaceAlias interne -ServerAddresses 10.144.0.1
+Rename-NetAdapter -Name "ethernet 3"  -NewName MPIO2
+New-NetIPAddress -InterfaceAlias Interne -IPAddress 10.144.2.30 -PrefixLength 24 
+Set-DnsClientServerAddress -InterfaceAlias interne -ServerAddresses 10.144.0.1
+
+#creation de 9 disques de 4TB dans le repertoire hyper-v\hote-03
+New-VHD -Path C:\Hyper-V\Hote-03\DD1.vhdx -SizeBytes 4TB -Dynamic
+New-VHD -Path C:\Hyper-V\Hote-03\DD2.vhdx -SizeBytes 4TB -Dynamic
+New-VHD -Path C:\Hyper-V\Hote-03\DD3.vhdx -SizeBytes 4TB -Dynamic
+New-VHD -Path C:\Hyper-V\Hote-03\DD4.vhdx -SizeBytes 4TB -Dynamic
+New-VHD -Path C:\Hyper-V\Hote-03\DD5.vhdx -SizeBytes 4TB -Dynamic
+New-VHD -Path C:\Hyper-V\Hote-03\DD6.vhdx -SizeBytes 4TB -Dynamic
+New-VHD -Path C:\Hyper-V\Hote-03\DD7.vhdx -SizeBytes 4TB -Dynamic
+New-VHD -Path C:\Hyper-V\Hote-03\DD8.vhdx -SizeBytes 4TB -Dynamic
+New-VHD -Path C:\Hyper-V\Hote-03\DD9.vhdx -SizeBytes 4TB -Dynamic
+ajout de disque dans la vm
+Add-VMHardDiskDrive -VMName Hote-03 -Path C:\Hyper-V\Hote-03\DD1.vhdx
+Add-VMHardDiskDrive -VMName Hote-03 -Path C:\Hyper-V\Hote-03\DD2.vhdx
+Add-VMHardDiskDrive -VMName Hote-03 -Path C:\Hyper-V\Hote-03\DD3.vhdx
+Add-VMHardDiskDrive -VMName Hote-03 -Path C:\Hyper-V\Hote-03\DD4.vhdx
+Add-VMHardDiskDrive -VMName Hote-03 -Path C:\Hyper-V\Hote-03\DD5.vhdx
+Add-VMHardDiskDrive -VMName Hote-03 -Path C:\Hyper-V\Hote-03\DD6.vhdx
+Add-VMHardDiskDrive -VMName Hote-03 -Path C:\Hyper-V\Hote-03\DD7.vhdx
+Add-VMHardDiskDrive -VMName Hote-03 -Path C:\Hyper-V\Hote-03\DD8.vhdx
+Add-VMHardDiskDrive -VMName Hote-03 -Path C:\Hyper-V\Hote-03\DD9.vhdx
+
+
+$physicaldisk = Get-PhysicalDisk -canpool $true
+New-StoragePool -FriendlyName "StoragePool01" -StorageSubSystemFriendlyName "windows storage*" -PhysicalDisks $physicaldisk
+New-VirtualDisk -StoragePoolFriendlyName storagepool1 -FriendlyName VirtualDisk1 -ResiliencySettingName Mirror -Size 128TB -ProvisioningType Thin -NumberOfDataCopies 3
+
+Get-Disk
+Get-Disk -Number 10 | Initialize-Disk -PassThru | New-Partition -DriveLetter E -Size 64TB | Format-Volume -FileSystem ReFS
+
+Install-WindowsFeature -Name iscsitarget-vss-vds, fs-iscsitarget-server -IncludeAllSubFeature -IncludeManagementTools
+
+
+New-IscsiVirtualDisk -Path 'E:\IscsiVirtualDisk\Disk1.vhdx' -SizeBytes 15TB
+New-IscsiVirtualDisk -Path 'E:\IscsiVirtualDisk\Disk2.vhdx' -SizeBytes 15TB
+New-IscsiVirtualDisk -Path 'E:\IscsiVirtualDisk\Disk3.vhdx' -SizeBytes 15TB
+New-IscsiVirtualDisk -Path 'E:\IscsiVirtualDisk\Disk4.vhdx' -SizeBytes 100GB
+
+
+New-IscsiVirtualDisk -Path 'E:\IscsiVirtualDisk\Disk1.vhdx' -SizeBytes 15TB
+
+New-IscsiVirtualDisk -Path 'E:\iscs\Disk2.vhdx' -SizeBytes 15TB
+
+New-IscsiVirtualDisk -Path 'E:\IscsiVirtualDisk\Disk3.vhdx' -SizeBytes 15TB
+
+New-IscsiVirtualDisk -Path 'E:\IscsiVirtualDisk\Disk4.vhdx' -SizeBytes 100GB
+ 
+New-IscsiServerTarget -TargetName target1 -InitiatorIds 'iqn:iqn.1991-05.com.microsoft:hote-01.form-it.lab','iqn:iqn.1991-05.com.microsoft:hote-02.form-it.lab'
+ 
+'
+
+$cred = Get-Credential form-it\admin
+
+Invoke-Command -VMName Hote-01,Hote-02 -ScriptBlock { install-windowsfeature Multipath-IO -IncludeAllSubFeature -IncludeManagementTools } -credential $cred
+
+Set-VMProcessor -ExposeVirtualizationExtensions:$true -VMName Hote-01,hote-02
+
+Get-VMNetworkAdapter -VMName Hote-01,hote-02 | Set-VMNetworkAdapter -MacAddressSpoofing on
+
+Invoke-Command -VMName Hote-02 -ScriptBlock { enable-msdsmautomaticclaim -BusType iscsi ; enable-msdsmautomaticclaim -BusType SAS } -credential $cred
+
+Invoke-Command -VMName Hote-01,Hote-02 -ScriptBlock { install-windowsfeature Hyper-v -IncludeAllSubFeature -IncludeManagementTools -restart } -credential $cred
+
+Invoke-Command -VMName Hote-01,Hote-02 -ScriptBlock { install-windowsfeature -Name Failover-Clustering -IncludeAllSubFeature -IncludeManagementTools  } -credential $cred
+
+Test-Cluster -Node Hote-01.form-it.lab,hote-02.form-it.lab
+
+New-Cluster -Node Hote-01.form-it.lab,Hote-02.form-it.lab -name cluster-Failover -StaticAddress 10.144.0.144
+
+Invoke-Command -VMName Hote-01,Hote-02 -ScriptBlock { New-VMSwitch -name Externe -NetAdapterName Interne} -credential $cred
+
+Invoke-Command -VMName Hote-01 -ScriptBlock {Set-VMHost -VirtualHardDiskPath c:\clusterstorage\volume1-hote01\Hyper-V -VirtualMachinePath c:\clusterstorage\volume1-hote01\Hyper-V} -credential $cred
+
+Invoke-Command -VMName Hote-02 -ScriptBlock {New-VM -MemoryStartupBytes 2GB -Generation 2 -Name SRV-WEB2 -Path c:\clusterstorage\volume3-hote02\Hyper-V\ -NewVHDPath c:\clusterstorage\volume3-hote02\Hyper-V\SRV-WEB2\srv-web2.vhdx -NewVHDSizeBytes 100GB -SwitchName Externe } -credential $cred
+
+Invoke-Command -VMName Hote-01 -ScriptBlock {New-VM -MemoryStartupBytes 2GB -Generation 2 -Name SRV-WEB1 -Path c:\clusterstorage\volume1-hote01\Hyper-V\ -NewVHDPath c:\clusterstorage\volume1-hote01\Hyper-V\SRV-WEB2\srv-web1.vhdx -NewVHDSizeBytes 100GB -SwitchName Externe } -credential $cred
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

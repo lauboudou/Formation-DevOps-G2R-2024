@@ -1,0 +1,108 @@
+activer hyper-v
+enabled-WindowsOptionalFeature -Online -FeatureName Microsoft-hyper-v-all
+verifier les cartes réseaux 
+Get-NetAdapter
+création d'un switch externe
+New-VMSwitch -name Externe -NetAdapterName WI-FI
+création de switch privé
+New-VMSwitch -name MPIO1 -SwitchType Private
+New-VMSwitch -name MPIO2 -SwitchType Private
+New-VMSwitch -name Pulsation -SwitchType Private  
+création de switch interne 
+New-VMSwitch -name Interne -SwitchType Internal
+
+
+
+Création d'une VM ( Master)
+
+New-VM -Name Master -MemoryStartupBytes 6GB -Path c:\hyper-v\Master -NewVHDPath C:\Hyper-V\Master\Master.vhdx -Generation 2 -SwitchName interne -NewVHDSizeBytes 200GB
+Activer les services d'invité (tools)
+Enable-VMIntegrationService -VMName Master -Name Interface*
+modifier le nombre de CPU
+Set-VM -Name Master -ProcessorCount 2
+desactiver le point de control ( désactiver le snapshot)
+Set-VM -Name Master -CheckpointType Disabled
+
+
+Ajouter un fichier iso pour l'installer sur Master
+
+Add-VMDvdDrive -VMName Master -Path C:\Users\admin\Downloads\Windows-Server-2022-EVAL_x64FRE_fr-fr.iso
+
+Déclaration d'une variable pour faire passer le VMDvdDrive en premier lors de boot
+
+$vmdvd = Get-VMDvdDrive -VMName Master
+Set-VMFirmware -VMName Maaster -FirstBootDevice $vmdvd
+
+
+Procedure pour le sysprep (enlever les parametres specifique à une machine en vue de le deployer ou de le cloner )
+cd C:\windows\system32\sysprep
+taper .\sysprep.exe /generalize /oobe /shutdown
+ou 
+C:\windows\system32\sysprep\sysprep.exe /generalize /oobe /shutdown
+
+
+mettre disque de Master en lecture seul (Read Only)
+  creation de disque de différenciation à partir d'un Parent
+
+New-VHD -Path C:\Hyper-V\Hote-01\Hote-01.vhdx -ParentPath c:\hyper-v\master\master.vhdx -Differencing
+New-VHD -Path C:\Hyper-V\Hote-02\Hote-02.vhdx -ParentPath c:\hyper-v\master\master.vhdx -Differencing
+New-VHD -Path C:\Hyper-V\Hote-03\Hote-03.vhdx -ParentPath c:\hyper-v\master\master.vhdx -Differencing
+New-VHD -Path C:\Hyper-V\DC-01\DC-01.vhdx -ParentPath c:\hyper-v\master\master.vhdx -Differencing
+
+creation de VMs à partir de disque de differenciation 
+New-VM -Name Hote-03 -MemoryStartupBytes 6GB -Path c:\hyper-v\Hote-03 -VHDPath C:\Hyper-V\Hote-03\Hote-03.vhdx -Generation 2 -SwitchName interne
+New-VM -Name Hote-02 -MemoryStartupBytes 6GB -Path c:\hyper-v\Hote-02 -VHDPath C:\Hyper-V\Hote-02\Hote-02.vhdx -Generation 2 -SwitchName interne
+New-VM -Name Hote-01 -MemoryStartupBytes 6GB -Path c:\hyper-v\Hote-01 -VHDPath C:\Hyper-V\Hote-01\Hote-01.vhdx -Generation 2 -SwitchName interne
+New-VM -Name DC-01 -MemoryStartupBytes 6GB -Path c:\hyper-v\DC-01 -VHDPath C:\Hyper-V\DC-01\DC-01.vhdx -Generation 2 -SwitchName interne
+Enable-VMIntegrationService -VMName DC-01, Hote-01, hote-02, hote-03 -Name Interface*
+Set-VM -Name DC-01, Hote-01, hote-02, hote-03 -ProcessorCount 2
+Set-VM -Name DC-01, Hote-01, hote-02, hote-03 -CheckpointType Disabled
+
+
+
+TP 09/04/2024
+Modifications sur une VM 
+Renommer la machine
+Rename-Computer DC-01
+
+Récupérer les cartes réseaux
+Get-NetAdapter
+
+Renommer la carte Ethernet
+Rename-NetAdapter -name ethernet -NewName Interne
+
+Renommer l'utilisateur Administrateur
+Rename-LocalUser Administrateur -NewName Admin
+
+Rédemarrer la machine
+Restart-Computer
+
+Fixer les paramètres IPs
+New-NetIPAddress -InterfaceAlias interne -IPAddress 10.144.0.1 -PrefixLength 24 -DefaultGateway 10.144.0.254
+Set-DnsClientServerAddress -InterfaceAlias interne -ServerAddresses 10.144.0.1
+
+//Installer le ADDS
+Install-WindowsFeature AD-Domain-Services -IncludeAllSubFeature -IncludeManagementTools
+
+Set-DnsClientServerAddress -InterfaceAlias interne -ServerAddresses 10.144.0.1
+
+Set-DnsServerPrimaryZone -ComputerName DC-01 -NetworkId 10.144.0.0/16 -DynamicUpdate Secure -ReplicationScope Domain
+
+Add-DnsServerPrimaryZone -ComputerName DC-01 -NetworkId 10.144.0.0/16 -DynamicUpdate Secure -ReplicationScope Domain
+
+Add-DnsServerResourceRecordPtr -Name "0.1" -PtrDomainName "DC-01.form-it.lab" -ZoneName "144.10.in-addr.arpa" -ComputerName DC-01
+
+
+
+
+
+New-NetIPAddress -InterfaceAlias interne -IPAddress 10.144.0.10 -PrefixLength 24 -DefaultGateway 10.144.0.254
+Set-DnsClientServerAddress -InterfaceAlias interne -ServerAddresses 10.144.0.10
+
+New-NetIPAddress -InterfaceAlias interne -IPAddress 10.144.0.20 -PrefixLength 24 -DefaultGateway 10.144.0.254
+Set-DnsClientServerAddress -InterfaceAlias interne -ServerAddresses 10.144.0.20
+
+New-NetIPAddress -InterfaceAlias interne -IPAddress 10.144.0.30 -PrefixLength 24 -DefaultGateway 10.144.0.254
+Set-DnsClientServerAddress -InterfaceAlias interne -ServerAddresses 10.144.0.30
+
+

@@ -1,0 +1,5 @@
+---
+# tasks file for newrole
+- name: Affiche un message
+  debug:
+    msg: "{{message}}"

@@ -1,0 +1,99 @@
+pipeline {
+    agent {
+        label 'agent_reactjs_node'
+    }
+    stages {
+        stage('clone') {
+            steps {
+                git branch: 'main', url: 'https://github.com/fredericEducentre/reactJS'
+            }
+        }
+         stage('build') {
+            steps {
+                sh 'npm install && npm run build'
+            }
+        }
+    }
+}
+
+
+
+
+Analyze "Test_reactJS": sqp_e7e68975f7b6b1ab182072099c1eaaa771f0abb1
+
+
+sonar-scanner \
+  -Dsonar.projectKey=Test_reactJS \
+  -Dsonar.sources=. \
+  -Dsonar.host.url=http://localhost:9000 \
+  -Dsonar.token=sqp_e7e68975f7b6b1ab182072099c1eaaa771f0abb1
+
+
+Analyze "Test-horoscope-zodiac-js": sqp_62903c2a5a2b7548542d80e2624c7b39b05cea43
+
+sonar-scanner \
+  -Dsonar.projectKey=Test-horoscope-zodiac-js \
+  -Dsonar.sources=. \
+  -Dsonar.host.url=http://localhost:9000 \
+  -Dsonar.token=sqp_62903c2a5a2b7548542d80e2624c7b39b05cea43
+
+
+
+
+pipeline {
+    agent {
+        label 'agent_reactjs_node'
+    }
+    environment {
+      SONARQUBE_TOKEN = credentials('sonarqube-webhook')
+      SONARQUBE_URL = credentials('sonarqube-url')
+      DOCKERHUB_TOKEN  = credentials('dockerhub-credential')
+    }
+    stages {
+        stage('Clone') {
+            steps {
+                git branch: 'main', url: 'https://github.com/dlaubo/horoscope-zodiac-js'
+            }
+        }
+        stage('Build') {
+            steps {
+                sh 'npm install && npm run build'
+            }
+        }
+        stage('Scan'){
+            steps {
+                withSonarQubeEnv(installationName: 'jenkins-sonarqube'){
+                sh '''
+                sonar-scanner \
+                -Dsonar.projectKey=Test-horoscope-zodiac-js \
+                -Dsonar.sources=. \
+                -Dsonar.host.url=$SONARQUBE_URL \
+                -Dsonar.token=$SONARQUBE_TOKEN
+                '''
+                }
+            }
+        }
+        stage ('Quality Gate'){
+            steps {
+                timeout(time:4, unit: 'MINUTES'){
+                    waitForQualityGate abortPipeline: true
+                }
+            }
+        }
+        stage('Delivery') {
+            steps {
+                sh '''
+                  docker login -u dlaubo -p $DOCKERHUB_TOKEN
+                  docker build . -t dlaubo/horoscope-zodiac-js
+                  docker push dlaubo/horoscope-zodiac-js
+                '''
+            }
+        }
+
+
+    }
+}
+
+
+
+

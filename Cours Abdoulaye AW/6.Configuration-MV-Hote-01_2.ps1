@@ -1,7 +1,5 @@
 #HOTE-01_2
 
-Add-Computer -DomaineName form-it.lab -Credential admin@form-it.lab
-
 #se connecter avec Admin ( l'administrateur du domaine)
 
 Rename-NetAdapter -Name "ethernet 2"  -NewName MPIO1

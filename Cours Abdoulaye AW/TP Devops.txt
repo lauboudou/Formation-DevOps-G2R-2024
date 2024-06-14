@@ -1,0 +1,79 @@
+TP1
+ Automatiser la Gestion de Conteneurs Docker avec un Script Bash
+Objectif :
+Créer un script Bash qui permet de :
+
+Créer des conteneurs Docker.
+Démarrer des conteneurs Docker.
+Arrêter des conteneurs Docker.
+Supprimer des conteneurs Docker.
+Lister les conteneurs Docker en cours d'exécution.
+Afficher les logs d'un conteneur Docker.
+Prérequis :
+Docker doit être installé et configuré sur votre machine.
+Des connaissances de base en Bash et en Docker.
+
+Prérequis :
+Docker doit être installé et configuré sur votre machine.
+
+Instructions :
+Créez un fichier appelé deploiement.sh
+
+Ajoutez les commandes suivantes à votre script :
+#!/bin/bash
+
+###########################################################
+#
+# Description : deploiement à la volée de conteneur docker
+#
+# Auteur : Nom
+#
+# Date : 13/06/2024
+##########################################################
+
+echo "
+
+Options :
+        - --create : lancer des conteneurs
+        - --drop : supprimer les conteneurs créer par le script deploy.sh
+        - --infos : caractéristique des conteneurs (ip, nom, user...)
+        - --start : redémarrage des conteneurs 
+     
+"
+
+
+Creer plusieurs containeur avec l'instruction suivante 
+docker run -tid --name $USER-alpine alpine:latest
+
+supprimer un container
+docker rm -f $USER-alpine
+
+
+Automatisez la création de 5 conteneurs  puis relancer votre script pour en redéployer 5 de plus 
+automatisez la suppression des conteneurs, 
+automatisez aussi leurs lancement ainsi que l'affichage des infos
+
+
+nom contenaire
+docker inspect $(docker ps -aq) | jq -r '.[] | .Name' | awk 'BEGIN { FS = "," } NR == 1 { print "Name: " $1 }'
+
+ip contenaire
+docker inspect $(docker ps -aq) | grep "IPAddress" | awk 'BEGIN { FS = "," } NR == 3 { print $1 }'
+
+
+
+
+TP2
+
+Exercice : Automatiser la Création d'Utilisateurs Linux avec un Script Bash
+Objectif :
+Créer un script Bash qui permet de :
+
+Demander le nom et le mot de passe de chaque utilisateur.
+Créer les utilisateurs avec les informations fournies.
+Attribuer le mot de passe aux utilisateurs créés.
+Prérequis :
+Accès administrateur sur la machine où le script sera exécuté.
+Des connaissances de base en gestion des utilisateurs Linux.
+Instructions :
+Créez un fichier appelé create_users.sh

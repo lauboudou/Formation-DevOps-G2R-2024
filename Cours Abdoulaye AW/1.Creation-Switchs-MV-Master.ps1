@@ -18,8 +18,9 @@ New-VMSwitch -name Interne -SwitchType Internal
 
 
 #Création d'une VM ( Master)
+#New-VM -Name Master -MemoryStartupBytes 6GB -Path c:\hyper-v\Master -NewVHDPath C:\Hyper-V\Master\Master.vhdx -Generation 2 -SwitchName interne -NewVHDSizeBytes 200GB
 
-New-VM -Name Master -MemoryStartupBytes 6GB -Path c:\hyper-v\Master -NewVHDPath C:\Hyper-V\Master\Master.vhdx -Generation 2 -SwitchName interne -NewVHDSizeBytes 200GB
+New-VM -Name Master -MemoryStartupBytes 4GB -Path c:\hyper-v\Master -NewVHDPath C:\Hyper-V\Master\Master.vhdx -Generation 2 -SwitchName interne -NewVHDSizeBytes 70GB
 
 #Activer les services d'invité (tools)
 Enable-VMIntegrationService -VMName Master -Name Interface*

@@ -1,0 +1,71 @@
+en
+conf t
+hostname RT1	
+banner motd * acces interdit a tous sauf aux admin *
+no logging console
+ip domain-name awform.lab
+username ing-devops secret linux
+enable secret linux 
+line cons 0
+login local
+line vty 0 4
+login local
+ip ssh version 2
+crypto key generate rsa 
+2048
+line vty 0 4 
+transport input ssh
+int gig 0/0.8
+encapsulation dot1q 8
+ip addres 192.168.8.254 255.255.255.0
+ip nat inside
+int gig 0/0.9
+encapsulation dot1q 9
+ip addres 192.168.9.254 255.255.255.0
+ip nat inside
+int gig 0/0.10
+encapsulation dot1q 10
+ip addres 192.168.10.254 255.255.255.0
+ip nat inside
+int gig 0/0.11
+encapsulation dot1q 11
+ip addres 192.168.11.254 255.255.255.0
+ip nat inside
+int gig 0/0.12
+encapsulation dot1q 12
+ip addres 192.168.12.254 255.255.255.0
+ip nat inside
+int gig 0/0.13
+encapsulation dot1q 13
+ip addres 192.168.13.254 255.255.255.0
+ip nat inside
+int gig 0/0.14
+encapsulation dot1q 14
+ip addres 192.168.14.254 255.255.255.0
+ip nat inside
+int gig 0/0
+no shut
+
+int gig 0/1
+ip add 192.168.100.254 255.255.255.0
+ip nat outside
+no shut
+access-list 1 permit 192.168.8.0 0.0.0.254
+access-list 1 permit 192.168.9.0 0.0.0.254
+access-list 1 permit 192.168.10.0 0.0.0.254
+access-list 1 permit 192.168.11.0 0.0.0.254
+access-list 1 permit 192.168.12.0 0.0.0.254
+access-list 1 permit 192.168.13.0 0.0.0.254
+access-list 1 permit 192.168.14.0 0.0.0.254
+ip nat Inside source list 1 int gig 0/1 overload
+ip route 0.0.0.0 0.0.0.0 192.168.100.253
+do wr
+
+
+
+
+
+
+
+
+

@@ -1,0 +1,49 @@
+en
+conf t
+hostname SW1	
+banner motd * acces interdit a tous sauf aux admin *
+no logging console
+ip domain-name awform.lab
+username ing-devops secret linux
+enable secret linux 
+line cons 0
+login local
+line vty 0 4
+login local
+ip ssh version 2
+crypto key generate rsa 
+2048
+line vty 0 4 
+transport input ssh
+vlan 8
+name internet
+vlan 9 
+name supervision
+vlan 10
+name web
+vlan 11
+name glpi
+vlan 12
+name serveur
+vlan 13
+name telephonie
+vlan 14
+name administration
+interface gigabitethernet 0/1
+switchport access vlan 8
+interface gigabitethernet 0/2
+switchport access vlan 9
+interface gigabitethernet 0/3
+switchport access vlan 10
+interface gigabitethernet 1/0
+switchport access vlan 11
+interface gigabitethernet 1/1
+switchport access vlan 12
+interface gigabitethernet 1/2
+switchport access vlan 13
+interface gigabitethernet 1/3
+switchport access vlan 14
+interface gigabitethernet 0/0
+switchport trunk encapsulation dot1Q
+switchport mode trunk
+
